@@ -58,8 +58,8 @@ instead of sculpting; with it off, they never take a click.
 
 ## Sizes and memory
 
-Images larger than 4096 pixels on their longer side are scaled down when they load; files over 64 MB aren't
-loaded. A project holds up to 8 reference images. The section shows how much graphics memory they take (a 4096 x
+Images larger than 4096 pixels on their longer side are scaled down when they load; files over 64 MB and images
+over 64 megapixels aren't loaded. A project holds up to 8 reference images. The section shows how much graphics memory they take (a 4096 x
 4096 image about 85 MB, a 2048 x 2048 one about 21 MB).
 
 ## From a script

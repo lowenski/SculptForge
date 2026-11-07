@@ -41,7 +41,18 @@ bool parsePlane(const std::string& s, ReferencePlane& p) {
 }
 
 // A decoded image kept to the size cap; `scaled` says whether it had to shrink.
+// The header is checked first: a shared project's image can claim huge dimensions in a tiny file, and the decoder
+// would allocate for them before any later check.
 bool decodeCapped(const unsigned char* bytes, size_t size, Image& out, bool& scaled, std::string& error) {
+    int w = 0, h = 0;
+    if (!Image::dimensions(bytes, size, w, h)) {
+        error = "Not a PNG or JPEG image";
+        return false;
+    }
+    if (w <= 0 || h <= 0 || size_t(w) * size_t(h) > kReferenceMaxPixels) {
+        error = "Reference images are limited to " + std::to_string(kReferenceMaxPixels >> 20) + " megapixels";
+        return false;
+    }
     if (!Image::decode(bytes, size, out, error)) return false;
     scaled = std::max(out.width, out.height) > kReferenceMaxSide;
     if (scaled) out = out.downscaled(kReferenceMaxSide);

@@ -9,7 +9,8 @@ added: **Reference images** (View > Reference images; idea by Oslen on Discord):
   opacity, flips, lock and hide; **Adjust** moves it and scales it from its corners (Shift keeps its proportions).
   **Front + side...** makes a front and a side plane from two files in one click. They never take strokes or picks
   and are left out of renders, exports, thumbnails and the timelapse unless **Show in renders** is on. Projects
-  keep them, embedded or by path; images over 4096 px are scaled down, files over 64 MB refused, 8 per project.
+  keep them, embedded or by path; images over 4096 px are scaled down, files over 64 MB or 64 megapixels refused
+  (read from the header, before decoding), 8 per project.
   Scriptable: `reference_add`, `reference_set`, `reference_remove`, `reference_pair`.
 testers:
   - Windows at 150% scaling: View > Reference images > Add images..., pick a photo. It shows behind the model; turn

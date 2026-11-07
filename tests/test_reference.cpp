@@ -6,6 +6,7 @@
 #include "TestHarness.h"
 
 #include "core/Commands.h"
+#include "core/Json.h"
 #include "core/Primitives.h"
 #include "core/Project.h"
 #include "core/Reference.h"
@@ -15,6 +16,7 @@
 
 #include <cmath>
 #include <filesystem>
+#include <fstream>
 
 using namespace sf;
 
@@ -39,6 +41,18 @@ std::string writeImage(const char* name, int w, int h) {
     std::string err;
     CHECK(img.savePng(path, err));
     return path;
+}
+
+// A tiny grey PNG whose header claims w x h pixels (one empty IDAT): what a crafted project could carry.
+std::vector<uint8_t> hugeHeaderPng(uint32_t w, uint32_t h) {
+    std::vector<uint8_t> b = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+    for (uint32_t v : {w, h})
+        for (int s = 24; s >= 0; s -= 8) b.push_back(uint8_t(v >> s));
+    for (uint8_t v : {8, 0, 0, 0, 0}) b.push_back(v); // 8-bit grey
+    for (int i = 0; i < 4; ++i) b.push_back(0);       // CRC (stb doesn't check it)
+    const uint8_t tail[] = {0, 0, 0, 0, 'I', 'D', 'A', 'T', 0, 0, 0, 0, 0, 0, 0, 0, 'I', 'E', 'N', 'D', 0, 0, 0, 0};
+    b.insert(b.end(), std::begin(tail), std::end(tail));
+    return b;
 }
 
 AABB unitBox() {
@@ -192,4 +206,36 @@ TEST(reference_project_round_trip) {
     CHECK(missing.references.size() == 2 && missing.references[0].image && !missing.references[1].image);
     CHECK(!missing.references[1].shown());
     std::filesystem::remove(path);
+}
+
+TEST(reference_refuses_huge_headers_before_decoding) {
+    // 20000 x 20000 (400 MP) decodes to 1.6 GB of RGBA: refused from the header alone, in a project, a file and a
+    // command. (A JPEG header can claim far more; stb only caps PNGs, at about 1 GB.)
+    const std::vector<uint8_t> png = hugeHeaderPng(20000, 20000);
+    int w = 0, h = 0;
+    CHECK(Image::dimensions(png.data(), png.size(), w, h) && w == 20000 && h == 20000);
+
+    Json j = Json::object();
+    j.set("name", std::string("huge.png"));
+    ReferenceImage ref;
+    CHECK(referenceFromJson(j, &png, ref));
+    CHECK(!ref.image); // the entry is kept (shown as missing), without decoding anything
+
+    const std::string path = tempPath("sf_ref_huge.png");
+    {
+        std::ofstream f(path, std::ios::binary);
+        f.write(reinterpret_cast<const char*>(png.data()), std::streamsize(png.size()));
+    }
+    ReferenceImage file;
+    std::string err;
+    CHECK(!loadReferenceFile(path, file, err));
+    CHECK(err.find("megapixels") != std::string::npos);
+    Document doc = makeDoc(makeIcosphere(1));
+    CommandRegistry reg;
+    CHECK(!reg.execute(doc, "reference_add", {{"path", path}}).ok);
+    CHECK(doc.references.empty());
+    std::filesystem::remove(path);
+
+    const std::vector<uint8_t> junk = {1, 2, 3, 4};
+    CHECK(!Image::dimensions(junk.data(), junk.size(), w, h));
 }
