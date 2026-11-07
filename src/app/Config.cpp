@@ -95,6 +95,7 @@ Json toJson(const UiPrefs& p) {
     j.set("inputStyle", std::string(p.inputStyle == 3 ? "maya" : p.inputStyle == 2 ? "blender" : p.inputStyle == 1 ? "sculptforge" : "classic"));
     j.set("emulateNumpad", p.emulateNumpad);
     j.set("rightClickQuickMenu", p.rightClickQuickMenu);
+    j.set("modifierBrushes", toJson(p.modifierBrushes));
     j.set("brushSort", p.brushSort);
     j.set("alphaSort", p.alphaSort);
     j.set("materialSort", p.materialSort);
@@ -188,6 +189,7 @@ void fromJson(const Json& j, UiPrefs& p) {
     }
     p.emulateNumpad = j["emulateNumpad"].asBool(p.emulateNumpad);
     p.rightClickQuickMenu = j["rightClickQuickMenu"].asBool(p.rightClickQuickMenu);
+    fromJson(j["modifierBrushes"], p.modifierBrushes);
     for (auto [key, v] : {std::pair{"brushSort", &p.brushSort}, std::pair{"alphaSort", &p.alphaSort},
                           std::pair{"materialSort", &p.materialSort}, std::pair{"librarySort", &p.librarySort}})
         if (j[key].isString()) *v = listSortId(listSortFromId(j[key].asString()));
@@ -812,6 +814,7 @@ void App::initActions() {
     registerInputActions();     // the Classic sculpting keys: U I O, Space, L, V, Ctrl+A / I / H / W..., the input style (Input.cpp)
     registerTimelineUiActions(); // Sculpt Timeline, timelapse, Help > Benchmark (PanelTimeline.cpp)
 
+    registerModifierBrushCommands(); // the Shift and Ctrl brushes (ModifierBrush.cpp)
     registerBrushSets(); // brush set commands and actions; the active set's shelf back (PanelBrushSets.cpp)
     // Every command, so the command palette finds anything scriptable.
     actions_.registerCommands(
