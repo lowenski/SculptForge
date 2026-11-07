@@ -99,6 +99,7 @@ add_library(sculptforge_core STATIC
   src/core/CloseHoles.cpp
   src/core/BrushAlpha.cpp
   src/core/Stencil.cpp
+  src/core/Reference.cpp
   src/core/Stroke.cpp
   src/core/Precision.cpp
   src/core/PathStroke.cpp
@@ -429,6 +430,7 @@ if(SCULPTFORGE_BUILD_APP)
     src/app/PanelVertexPaint.cpp
     src/app/LineGradient.cpp
     src/app/StencilOverlay.cpp
+    src/app/ReferenceImages.cpp
     src/app/PanelPacks.cpp
     src/app/PanelBrushSets.cpp
     src/app/MemoryConfirm.cpp

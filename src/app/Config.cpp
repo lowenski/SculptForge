@@ -797,6 +797,7 @@ void App::initActions() {
     registerTextureUiActions(); // Tool > Texture Map, the Vertex / Texture paint target (PanelTexture.cpp)
     registerLineGradientActions(); // Color > Line Gradient (LineGradient.cpp)
     registerStencilActions();   // Alpha > Stencil (StencilOverlay.cpp)
+    registerReferenceActions(); // View > Reference images (ReferenceImages.cpp)
     registerPbrUiActions();     // material channels, solo view, map export (PanelPbr.cpp)
     registerGizmoActions();     // Q W E R: Draw, and the Transform gizmo's Move, Scale, Rotate (Gizmo.cpp)
     registerBakeUiActions();    // Tool > Bake (PanelBake.cpp)
