@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 
 namespace sf {
 
@@ -26,6 +27,12 @@ const SDL_DialogFileFilter kReferenceFilters[] = {{"Images", "png;jpg;jpeg"}, {"
 const char* kWhere = "View > Reference images";
 
 double now() { return double(SDL_GetTicksNS()) * 1e-9; }
+
+// "photo.jpg" from a UTF-8 path.
+std::string fileName(const std::string& path) {
+    const auto name = std::filesystem::path(std::u8string(path.begin(), path.end())).filename().u8string();
+    return std::string(name.begin(), name.end());
+}
 
 // The pointer in the reference's own plane: Behind, window pixels; In the scene, world units along its axes from
 // `origin` (false when the ray misses the plane).
@@ -393,7 +400,11 @@ void App::drawReferencesSection() {
         const ReferenceImage& r = doc_.references[i];
         ImGui::PushID(int(i));
         const float nameW = ImGui::GetContentRegionAvail().x - 3.0f * (g + 2.0f);
-        const std::string label = r.image ? r.name : r.name + "  " + std::string(tr("(missing)"));
+        const std::string file = r.path.empty() ? r.name : fileName(r.path);
+        const std::string label = r.invalid  ? r.name + "  " + std::string(tr("(invalid image)"))
+                                  : !r.image ? r.name + "  " + std::string(tr("(missing)"))
+                                  : r.embed  ? r.name
+                                             : std::string(tr("linked:")) + " " + file;
         if (ImGui::Selectable(label.c_str(), int(i) == refUi_.selected, 0, ImVec2(nameW, g))) refUi_.selected = int(i);
         ui::HelpText("Reference image", nullptr, r.path.empty() ? "Select it to set it up below." : r.path.c_str(), kWhere);
         ImGui::SameLine(0.0f, 2.0f);

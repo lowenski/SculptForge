@@ -84,6 +84,10 @@ expect_value reference_count == 2
 click "Render##palette.render"
 expect_value reference_has_image == 1
 shot reopened
+# Embed off: the row reads "linked: front.png" (the full path in its tooltip).
+run reference_set index=0 embed=false
+shot linked
+run reference_set index=0 embed=true
 
 ui_scale 200
 hover "Adjust##ref.adjust"

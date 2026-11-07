@@ -36,7 +36,7 @@ Click an image's name in the list to select it. Then:
 | Opacity | How strongly the image shows. |
 | Flip across / Flip up/down | Mirror the image. |
 | Show in renders | Off (the default), the image shows only while you work: renders, exports, project thumbnails and the timelapse leave it out. On, they include it. |
-| Embed | On (the default), the project keeps the image inside it, so it opens anywhere. Off, the project keeps only the file's path: a smaller project, but the image must stay where it is. A missing file shows as *(missing)* in the list. |
+| Embed | On (the default), the project keeps the image inside it, so it opens anywhere. Off, the project keeps only the file's path: a smaller project, but the image must stay where it is. Such an image shows as *linked: file name* in the list (point at it for the full path); a missing file shows as *(missing)*, a file that isn't a usable image as *(invalid image)*. An image a project names by path, rather than carrying it, always opens with Embed off, so saving never copies a picture from your computer into it unless you tick Embed. |
 | Reset placement | Back to where it came in, with the image's own proportions. |
 
 The eye button on each row shows or hides that image; the lock keeps it where it is; the cross removes it.
@@ -59,7 +59,7 @@ instead of sculpting; with it off, they never take a click.
 ## Sizes and memory
 
 Images larger than 4096 pixels on their longer side are scaled down when they load; files over 64 MB and images
-over 64 megapixels aren't loaded. A project holds up to 8 reference images. The section shows how much graphics memory they take (a 4096 x
+over 64 megapixels or 8192 pixels on a side aren't loaded. A project holds up to 8 reference images. The section shows how much graphics memory they take (a 4096 x
 4096 image about 85 MB, a 2048 x 2048 one about 21 MB).
 
 ## From a script

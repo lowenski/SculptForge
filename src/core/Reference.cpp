@@ -42,15 +42,18 @@ bool parsePlane(const std::string& s, ReferencePlane& p) {
 
 // A decoded image kept to the size cap; `scaled` says whether it had to shrink.
 // The header is checked first: a shared project's image can claim huge dimensions in a tiny file, and the decoder
-// would allocate for them before any later check.
+// would allocate for them before any later check. Every reference decode (file, project entry, reference_add) comes
+// through here.
 bool decodeCapped(const unsigned char* bytes, size_t size, Image& out, bool& scaled, std::string& error) {
     int w = 0, h = 0;
     if (!Image::dimensions(bytes, size, w, h)) {
         error = "Not a PNG or JPEG image";
         return false;
     }
-    if (w <= 0 || h <= 0 || size_t(w) * size_t(h) > kReferenceMaxPixels) {
-        error = "Reference images are limited to " + std::to_string(kReferenceMaxPixels >> 20) + " megapixels";
+    if (w <= 0 || h <= 0 || w > kReferenceMaxHeaderSide || h > kReferenceMaxHeaderSide ||
+        size_t(w) * size_t(h) > kReferenceMaxPixels) {
+        error = "Reference images are limited to " + std::to_string(kReferenceMaxHeaderSide) + " pixels a side and " +
+                std::to_string(kReferenceMaxPixels >> 20) + " megapixels";
         return false;
     }
     if (!Image::decode(bytes, size, out, error)) return false;
@@ -248,12 +251,19 @@ bool referenceFromJson(const Json& j, const std::vector<uint8_t>* embedded, Refe
         if (decodeCapped(embedded->data(), embedded->size(), img, scaled, err)) {
             r.image = std::make_shared<const Image>(std::move(img));
             if (!scaled) r.fileBytes = std::make_shared<const std::vector<uint8_t>>(*embedded);
-        }
+        } else
+            r.invalid = true;
     } else if (!r.path.empty()) { // by path: a file that moved leaves the entry without its image (the panel says so)
+        // The path names a file on this computer, chosen by whoever made the project: never embed it on the next save
+        // unless the user ticks Embed (else a shared project could pull a private picture into the file sent back).
+        r.embed = false;
         ReferenceImage loaded;
         if (loadReferenceFile(r.path, loaded, err)) {
             r.image = std::move(loaded.image);
             r.fileBytes = std::move(loaded.fileBytes);
+        } else {
+            std::error_code ec;
+            r.invalid = std::filesystem::exists(std::filesystem::path(std::u8string(r.path.begin(), r.path.end())), ec); // there, but not an image we take
         }
     }
     out = std::move(r);

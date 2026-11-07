@@ -31,7 +31,8 @@ enum class ReferencePlane : uint8_t { Front, Side, Top };
 
 constexpr int kMaxReferences = 8;                          // per project
 constexpr int kReferenceMaxSide = 4096;                    // longer side; bigger images are scaled down on load
-constexpr size_t kReferenceMaxPixels = size_t(64) << 20;    // a header claiming more is refused before decoding
+constexpr size_t kReferenceMaxPixels = size_t(64) << 20;    // a header claiming more is refused before decoding,
+constexpr int kReferenceMaxHeaderSide = 8192;               // and so is one with a longer side than this
 constexpr size_t kReferenceMaxFileBytes = size_t(64) << 20; // files bigger than this are refused
 constexpr size_t kReferenceMaxEmbedBytes = size_t(32) << 20; // the original file embeds as is up to this size
 
@@ -54,6 +55,7 @@ struct ReferenceImage {
     bool visible = true;
     bool inRenders = false; // also in renders, exports and the timelapse
     bool embed = true;      // saved inside the project (off: only its path)
+    bool invalid = false;   // its data isn't an image within the caps (not saved: the list says "(invalid image)")
 
     bool shown() const { return visible && image && !image->empty(); }
     float aspect() const { return image && !image->empty() ? image->aspect() : 1.0f; }

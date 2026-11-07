@@ -208,34 +208,109 @@ TEST(reference_project_round_trip) {
     std::filesystem::remove(path);
 }
 
-TEST(reference_refuses_huge_headers_before_decoding) {
-    // 20000 x 20000 (400 MP) decodes to 1.6 GB of RGBA: refused from the header alone, in a project, a file and a
-    // command. (A JPEG header can claim far more; stb only caps PNGs, at about 1 GB.)
-    const std::vector<uint8_t> png = hugeHeaderPng(20000, 20000);
-    int w = 0, h = 0;
-    CHECK(Image::dimensions(png.data(), png.size(), w, h) && w == 20000 && h == 20000);
+// A tiny JPEG whose frame header claims w x h pixels (no image data follows).
+std::vector<uint8_t> hugeHeaderJpeg(uint16_t w, uint16_t h) {
+    return {0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 8, uint8_t(h >> 8), uint8_t(h), uint8_t(w >> 8), uint8_t(w), 3,
+            1, 0x11, 0, 2, 0x11, 0, 3, 0x11, 0, 0xFF, 0xD9};
+}
 
+// How a project entry carrying `bytes` as its embedded image comes back.
+ReferenceImage fromEmbedded(const std::vector<uint8_t>& bytes) {
     Json j = Json::object();
-    j.set("name", std::string("huge.png"));
+    j.set("name", std::string("crafted"));
     ReferenceImage ref;
-    CHECK(referenceFromJson(j, &png, ref));
-    CHECK(!ref.image); // the entry is kept (shown as missing), without decoding anything
+    CHECK(referenceFromJson(j, &bytes, ref));
+    return ref;
+}
 
-    const std::string path = tempPath("sf_ref_huge.png");
-    {
-        std::ofstream f(path, std::ios::binary);
-        f.write(reinterpret_cast<const char*>(png.data()), std::streamsize(png.size()));
-    }
-    ReferenceImage file;
-    std::string err;
-    CHECK(!loadReferenceFile(path, file, err));
-    CHECK(err.find("megapixels") != std::string::npos);
+TEST(reference_refuses_huge_headers_before_decoding) {
+    // 20000 x 20000 (400 MP) decodes to 1.6 GB of RGBA, a 60000 x 60000 JPEG to 14 GB, a 65536 x 1000 strip is under
+    // 64 MP but over 8192 a side: each refused from the header alone. A project entry comes back "(invalid image)",
+    // without its image; a file and reference_add are refused. (stb itself caps PNGs at about 1 GB, JPEGs not at all.)
+    int w = 0, h = 0;
+    const std::vector<uint8_t> png = hugeHeaderPng(20000, 20000);
+    CHECK(Image::dimensions(png.data(), png.size(), w, h) && w == 20000 && h == 20000);
+    const std::vector<uint8_t> jpeg = hugeHeaderJpeg(60000, 60000);
+    CHECK(Image::dimensions(jpeg.data(), jpeg.size(), w, h) && w == 60000 && h == 60000);
+    const std::vector<uint8_t> strip = hugeHeaderPng(65536, 1000);
+    CHECK(Image::dimensions(strip.data(), strip.size(), w, h) && size_t(w) * size_t(h) < kReferenceMaxPixels);
+    std::vector<uint8_t> truncated = hugeHeaderPng(100, 100);
+    truncated.resize(20); // cut inside IHDR
+    const std::vector<std::vector<uint8_t>> crafted = {png,
+                                                       jpeg,
+                                                       strip,
+                                                       hugeHeaderPng(0, 100),
+                                                       hugeHeaderPng(100, 0),
+                                                       hugeHeaderJpeg(0, 100),
+                                                       hugeHeaderJpeg(100, 0),
+                                                       truncated,
+                                                       {0xFF, 0xD8, 0xFF},
+                                                       {1, 2, 3, 4}};
     Document doc = makeDoc(makeIcosphere(1));
     CommandRegistry reg;
-    CHECK(!reg.execute(doc, "reference_add", {{"path", path}}).ok);
+    const std::string path = tempPath("sf_ref_crafted.png");
+    for (const std::vector<uint8_t>& bytes : crafted) {
+        const ReferenceImage ref = fromEmbedded(bytes);
+        CHECK(!ref.image && ref.invalid && !ref.shown());
+        {
+            std::ofstream f(path, std::ios::binary);
+            f.write(reinterpret_cast<const char*>(bytes.data()), std::streamsize(bytes.size()));
+        }
+        ReferenceImage file;
+        std::string err;
+        CHECK(!loadReferenceFile(path, file, err) && !err.empty());
+        CHECK(!reg.execute(doc, "reference_add", {{"path", path}}).ok);
+        // By path from a project: there, but not an image we take.
+        Json j = Json::object();
+        j.set("path", path);
+        ReferenceImage linked;
+        CHECK(referenceFromJson(j, nullptr, linked) && !linked.image && linked.invalid);
+    }
     CHECK(doc.references.empty());
     std::filesystem::remove(path);
 
-    const std::vector<uint8_t> junk = {1, 2, 3, 4};
-    CHECK(!Image::dimensions(junk.data(), junk.size(), w, h));
+    // A file that is only missing is not "invalid".
+    Json gone = Json::object();
+    gone.set("path", tempPath("sf_ref_not_there.png"));
+    ReferenceImage missing;
+    CHECK(referenceFromJson(gone, nullptr, missing) && !missing.image && !missing.invalid);
+}
+
+TEST(reference_by_path_from_a_project_is_never_embedded) {
+    // A project names a file on the opener's disk (and says embed): it loads linked, and saving doesn't pull the
+    // picture into the project until the user ticks Embed.
+    const std::string img = writeImage("sf_ref_private.png", 16, 16);
+    Json j = Json::object();
+    j.set("name", std::string("private"));
+    j.set("path", img);
+    j.set("embed", true);
+    ReferenceImage ref;
+    CHECK(referenceFromJson(j, nullptr, ref));
+    CHECK(ref.image && !ref.embed);
+
+    Document doc = makeDoc(makeIcosphere(1));
+    doc.references.push_back(ref);
+    const std::string first = tempPath("sf_ref_opened.sfproj"), second = tempPath("sf_ref_resaved.sfproj");
+    std::string err;
+    CHECK(saveProject(first, doc, err));
+    Document opened;
+    CHECK(loadProject(first, opened, err));
+    CHECK(opened.references.size() == 1 && opened.references[0].image && !opened.references[0].embed);
+    CHECK(saveProject(second, opened, err));
+    std::filesystem::remove(img); // the picture is only on "this" computer: the saved project must not carry it
+    Document back;
+    CHECK(loadProject(second, back, err));
+    CHECK(back.references.size() == 1 && !back.references[0].image && !back.references[0].embed);
+
+    // Ticked by the user, it embeds.
+    const std::string img2 = writeImage("sf_ref_private.png", 16, 16);
+    CommandRegistry reg;
+    CHECK(reg.execute(opened, "reference_set", {{"index", 0.0}, {"embed", true}}).ok);
+    CHECK(saveProject(second, opened, err));
+    std::filesystem::remove(img2);
+    Document embedded;
+    CHECK(loadProject(second, embedded, err));
+    CHECK(embedded.references.size() == 1 && embedded.references[0].image && embedded.references[0].embed);
+    std::filesystem::remove(first);
+    std::filesystem::remove(second);
 }
