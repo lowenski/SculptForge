@@ -24,11 +24,11 @@
 
 using namespace sf;
 
-TEST(brush_packs_six_packs_of_ten) {
+TEST(brush_packs_six_packs_of_ten) { // (Hard Surface has an eleventh: Crisp Flatten)
     const std::vector<BrushRecipe> all = builtinBrushRecipes();
     const std::vector<BrushRecipe> packs = builtinPackRecipes();
     CHECK(builtinBrushPacks().size() == 6);
-    CHECK(packs.size() == 60);
+    CHECK(packs.size() == 61);
     CHECK(all.size() == 7 + packs.size()); // the classic seven first
     std::map<std::string, int> perPack;
     std::set<std::string> names;
@@ -46,7 +46,7 @@ TEST(brush_packs_six_packs_of_ten) {
             CHECK(BrushAlpha::builtin(r.alpha, a) && a.name == r.alpha);
         }
     }
-    for (const std::string& p : builtinBrushPacks()) CHECK(perPack[p] == 10);
+    for (const std::string& p : builtinBrushPacks()) CHECK(perPack[p] == (p == "Hard Surface" ? 11 : 10));
 }
 
 TEST(brush_recipe_alpha_keys_round_trip) {
@@ -141,7 +141,7 @@ TEST(brush_packs_every_brush_leaves_a_clean_mark) {
             slowest = r.name;
         }
     }
-    std::printf("  60 pack brush strokes: %.0f ms in all, slowest %s %.0f ms\n", totalMs, slowest.c_str(), slowestMs);
+    std::printf("  61 pack brush strokes: %.0f ms in all, slowest %s %.0f ms\n", totalMs, slowest.c_str(), slowestMs);
     CHECK(slowestMs < timeLimit(400.0));
 }
 
